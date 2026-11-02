@@ -123,7 +123,7 @@ public sealed class SonarrFlagControllerTests : IDisposable
 
         _sonarr.Respond("GET series", new[] { new { id = 2, title = "The Show", tvdbId = 123 } });
         _sonarr.Respond("GET episode?seriesId=2", new[] { new { id = 11, seasonNumber = 1, episodeNumber = 1, episodeFileId = 100, hasFile = true } });
-        _sonarr.Respond("GET history/episode?episodeId=11", Array.Empty<object>());
+        _sonarr.RespondHistory(11, Array.Empty<object>());
         _sonarr.Accept("DELETE episodefile/100", "PUT episode/monitor", "POST command");
         return episodeId;
     }

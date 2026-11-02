@@ -10,6 +10,8 @@ public record SonarrEpisode(int Id, int SeasonNumber, int EpisodeNumber, int Epi
 
 public record SonarrHistoryRecord(int Id, int EpisodeId, string EventType, DateTime Date, string? DownloadId);
 
+public record SonarrPage<T>(List<T> Records);
+
 public class SonarrException : Exception
 {
     public SonarrException(string message, Exception? innerException = null)

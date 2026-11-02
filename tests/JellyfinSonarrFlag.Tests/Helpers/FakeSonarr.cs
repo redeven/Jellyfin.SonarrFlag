@@ -43,6 +43,10 @@ public sealed class FakeSonarr : HttpMessageHandler
             Content = new StringContent(body as string ?? JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json")
         };
 
+    /// <summary>Routes an episode's history lookup to a single page holding <paramref name="records"/>.</summary>
+    public void RespondHistory(int episodeId, params object[] records)
+        => Respond($"GET history?episodeId={episodeId}&pageSize=1000", new { records });
+
     public void Accept(params string[] routes)
     {
         foreach (var route in routes)

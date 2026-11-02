@@ -43,13 +43,13 @@ public sealed class BrokenEpisodeServiceTests : IDisposable
             new { id = 12, seasonNumber = 1, episodeNumber = 3, episodeFileId = 100, hasFile = true, monitored = true },
             new { id = 13, seasonNumber = 2, episodeNumber = 2, episodeFileId = 101, hasFile = true, monitored = true }
         });
-        _sonarr.Respond("GET history/episode?episodeId=11", new object[]
+        _sonarr.RespondHistory(11, new object[]
         {
             History(50, 11, "grabbed", "2026-01-01", "A"),
             History(60, 11, "downloadFolderImported", "2026-01-02", "A"),
             History(51, 11, "grabbed", "2026-03-01", "B")
         });
-        _sonarr.Respond("GET history/episode?episodeId=12", new object[]
+        _sonarr.RespondHistory(12, new object[]
         {
             History(52, 12, "grabbed", "2026-01-01", "A"),
             History(61, 12, "downloadFolderImported", "2026-01-02", "A")
@@ -74,7 +74,7 @@ public sealed class BrokenEpisodeServiceTests : IDisposable
             [
                 "GET series",
                 "GET episode?seriesId=2",
-                "GET history/episode?episodeId=11",
+                "GET history?episodeId=11&pageSize=1000",
                 "POST history/failed/50",
                 "DELETE episodefile/100",
                 "PUT episode/monitor",
@@ -102,7 +102,7 @@ public sealed class BrokenEpisodeServiceTests : IDisposable
     [Fact]
     public async Task WithoutAnImport_BlocklistsTheLatestGrab()
     {
-        _sonarr.Respond("GET history/episode?episodeId=11", new object[]
+        _sonarr.RespondHistory(11, new object[]
         {
             History(50, 11, "grabbed", "2026-01-01", "A"),
             History(51, 11, "grabbed", "2026-03-01", "B")
@@ -133,7 +133,7 @@ public sealed class BrokenEpisodeServiceTests : IDisposable
     public async Task SharedGrab_IsOnlyBlocklistedOnce()
     {
         SetEpisode(season: 1, episode: 2, episodeEnd: 3);
-        _sonarr.Respond("GET history/episode?episodeId=12", new object[]
+        _sonarr.RespondHistory(12, new object[]
         {
             History(50, 12, "grabbed", "2026-01-01", "A"),
             History(61, 12, "downloadFolderImported", "2026-01-02", "A")
@@ -147,7 +147,7 @@ public sealed class BrokenEpisodeServiceTests : IDisposable
     [Fact]
     public async Task WithoutHistory_StillDeletesAndSearches_AndWarns()
     {
-        _sonarr.Respond("GET history/episode?episodeId=11", Array.Empty<object>());
+        _sonarr.RespondHistory(11, Array.Empty<object>());
 
         var result = await _service.MarkBrokenAsync(EpisodeId, CancellationToken.None);
 

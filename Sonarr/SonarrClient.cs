@@ -8,6 +8,8 @@ public class SonarrClient
 {
     private const int MaxErrorBodyLength = 300;
 
+    private const int HistoryPageSize = 1000;
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IHttpClientFactory _httpClientFactory;
@@ -26,8 +28,11 @@ public class SonarrClient
     public Task<List<SonarrEpisode>> GetEpisodesAsync(SonarrConnection connection, int seriesId, CancellationToken cancellationToken)
         => SendAsync<List<SonarrEpisode>>(connection, HttpMethod.Get, $"episode?seriesId={seriesId}", null, cancellationToken);
 
-    public Task<List<SonarrHistoryRecord>> GetEpisodeHistoryAsync(SonarrConnection connection, int episodeId, CancellationToken cancellationToken)
-        => SendAsync<List<SonarrHistoryRecord>>(connection, HttpMethod.Get, $"history/episode?episodeId={episodeId}", null, cancellationToken);
+    public async Task<List<SonarrHistoryRecord>> GetEpisodeHistoryAsync(SonarrConnection connection, int episodeId, CancellationToken cancellationToken)
+    {
+        var page = await SendAsync<SonarrPage<SonarrHistoryRecord>>(connection, HttpMethod.Get, $"history?episodeId={episodeId}&pageSize={HistoryPageSize}", null, cancellationToken).ConfigureAwait(false);
+        return page.Records.Where(r => r.EpisodeId == episodeId).ToList();
+    }
 
     /// <summary>Marks a grab as failed, which blocklists its release.</summary>
     public Task MarkFailedAsync(SonarrConnection connection, int historyId, CancellationToken cancellationToken)
