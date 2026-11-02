@@ -1,0 +1,21 @@
+[
+  {
+    "guid": "2ca81606-4649-40ac-9283-f61588982f64",
+    "name": "Sonarr Flag",
+    "description": "Mark broken episodes from Jellyfin, and have Sonarr replace them.",
+    "overview": "Mark broken episodes so Sonarr replaces them.",
+    "owner": "redeven",
+    "category": "General",
+    "imageUrl": "https://raw.githubusercontent.com/redeven/Jellyfin.SonarrFlag/main/Images/sonarr-flag.png",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Initial release.",
+        "targetAbi": "12.4.0.0",
+        "sourceUrl": "https://github.com/redeven/Jellyfin.SonarrFlag/releases/download/v1.0.0.0/Jellyfin.SonarrFlag_1.0.0.0.zip",
+        "checksum": "af176a4ae08c4b619a8200ffc809c7e3",
+        "timestamp": "2026-11-02T21:31:20Z"
+      }
+    ]
+  }
+]
