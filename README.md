@@ -7,7 +7,7 @@ Mark broken episodes from Jellyfin, and have Sonarr replace them.
 ## Features
 
 - **Mark as Broken** entry in the context menu of episodes, available from a card's ⋮ menu, a right-click, or the ⋮ button on an episode's details page.
-- A **Mark as Broken** button (<sub>heart_broken</sub> icon) in the video player's controls, next to the settings, picture-in-picture and fullscreen buttons.
+- A **Mark as Broken** button (💔 icon) in the video player's controls, next to the settings, picture-in-picture and fullscreen buttons.
 - After you confirm, Sonarr:
   1. blocklists the release the file came from, so the same release isn't downloaded again,
   2. deletes the episode file,
@@ -43,7 +43,7 @@ Mark broken episodes from Jellyfin, and have Sonarr replace them.
 
 ## Usage
 
-- Open the ⋮ menu of an episode and choose **Mark as Broken**, or click the <sub>heart_broken</sub> button while an episode is playing. Playback pauses while the confirmation is open.
+- Open the ⋮ menu of an episode and choose **Mark as Broken**, or click the 💔 button while an episode is playing. Playback pauses while the confirmation is open.
 - Confirm. A message tells you whether Sonarr accepted the request, or why it didn't.
 - Sonarr's **Activity** and **History** pages show the blocklisted release, the deleted file and the search.
 
