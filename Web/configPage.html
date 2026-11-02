@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Sonarr Flag</title>
+</head>
+<body>
+    <div id="SonarrFlagConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="SonarrFlagConfigForm">
+                    <div class="verticalSection">
+                        <h2 class="sectionTitle">Sonarr Flag</h2>
+                        <p>Connects the <strong>Mark as Broken</strong> buttons to Sonarr. Marking an episode as broken blocklists its release, deletes the file, monitors the episode and searches for a replacement.</p>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="url" id="SonarrUrl" label="Sonarr URL" placeholder="http://localhost:8989" required />
+                        <div class="fieldDescription">The address Jellyfin's server uses to reach Sonarr, including any URL base.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="password" id="SonarrApiKey" label="API key" autocomplete="off" required />
+                        <div class="fieldDescription">Found in Sonarr under Settings → General → Security.</div>
+                    </div>
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Save</span>
+                        </button>
+                        <button is="emby-button" type="button" id="SonarrFlagTest" class="raised button-cancel block emby-button">
+                            <span>Test connection</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <script type="text/javascript">
+            (function () {
+                const pluginId = '2ca81606-4649-40ac-9283-f61588982f64';
+                const page = document.querySelector('#SonarrFlagConfigPage');
+
+                page.addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        page.querySelector('#SonarrUrl').value = config.SonarrUrl || '';
+                        page.querySelector('#SonarrApiKey').value = config.SonarrApiKey || '';
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+                page.querySelector('#SonarrFlagConfigForm').addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.SonarrUrl = page.querySelector('#SonarrUrl').value.trim();
+                        config.SonarrApiKey = page.querySelector('#SonarrApiKey').value.trim();
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        });
+                    });
+                    return false;
+                });
+
+                page.querySelector('#SonarrFlagTest').addEventListener('click', function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.ajax({
+                        type: 'POST',
+                        url: ApiClient.getUrl('SonarrFlag/Test'),
+                        data: JSON.stringify({
+                            Url: page.querySelector('#SonarrUrl').value.trim(),
+                            ApiKey: page.querySelector('#SonarrApiKey').value.trim()
+                        }),
+                        contentType: 'application/json',
+                        dataType: 'json'
+                    }).then(function (result) {
+                        Dashboard.hideLoadingMsg();
+                        Dashboard.alert(result.Ok
+                            ? 'Connected to Sonarr ' + result.Version + '.'
+                            : 'Could not connect to Sonarr. ' + result.Error);
+                    }).catch(function () {
+                        Dashboard.hideLoadingMsg();
+                        Dashboard.alert('Could not test the connection.');
+                    });
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>
