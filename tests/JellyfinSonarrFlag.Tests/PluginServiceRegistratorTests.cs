@@ -17,6 +17,7 @@ public class PluginServiceRegistratorTests
         var collection = new ServiceCollection()
             .AddLogging()
             .AddSingleton(Substitute.For<ILibraryManager>())
+            .AddSingleton(Substitute.For<IUserManager>())
             .AddSingleton(Substitute.For<IHttpClientFactory>());
         new PluginServiceRegistrator().RegisterServices(collection, Substitute.For<IServerApplicationHost>());
         _services = collection.BuildServiceProvider();

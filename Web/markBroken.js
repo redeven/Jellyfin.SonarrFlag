@@ -13,7 +13,7 @@
     const SESSION_RETRIES = 3;
 
     let lastTrigger = null;
-    let adminCheck = null;
+    let permissionCheck = null;
     let lastVideoSrc = null;
     let osdRetryTimer = null;
 
@@ -50,22 +50,21 @@
     document.addEventListener('click', recordTrigger, true);
     document.addEventListener('contextmenu', recordTrigger, true);
 
-    /** Resolves to whether the signed-in user is an administrator, cached per user. */
-    function isAdmin() {
-        const client = window.ApiClient;
-        const userId = client.getCurrentUserId();
-        if (!adminCheck || adminCheck.userId !== userId) {
-            adminCheck = {
+    /** Resolves to whether the signed-in user may mark episodes as broken, cached per user. */
+    function canMarkBroken() {
+        const userId = window.ApiClient.getCurrentUserId();
+        if (!permissionCheck || permissionCheck.userId !== userId) {
+            permissionCheck = {
                 userId: userId,
-                promise: client.getCurrentUser().then(function (user) {
-                    return !!(user && user.Policy && user.Policy.IsAdministrator);
+                promise: api('GET', 'SonarrFlag/Permission').then(function (result) {
+                    return !!(result && result.CanMarkBroken);
                 }).catch(function () {
-                    adminCheck = null;
+                    permissionCheck = null;
                     return false;
                 })
             };
         }
-        return adminCheck.promise;
+        return permissionCheck.promise;
     }
 
     function isEpisode(item) {
@@ -244,9 +243,9 @@
             return;
         }
 
-        isAdmin().then(function (admin) {
+        canMarkBroken().then(function (allowed) {
             const client = window.ApiClient;
-            return admin ? client.getItem(client.getCurrentUserId(), trigger.id) : null;
+            return allowed ? client.getItem(client.getCurrentUserId(), trigger.id) : null;
         }).then(function (item) {
             if (!isEpisode(item) || !sheet.isConnected || sheet.querySelector('[data-id="' + MENU_ITEM_ID + '"]')) {
                 return;
@@ -272,8 +271,8 @@
 
     /** Resolves to the item playing in this browser, or null. */
     function nowPlaying() {
-        return isAdmin().then(function (admin) {
-            if (!admin) {
+        return canMarkBroken().then(function (allowed) {
+            if (!allowed) {
                 return null;
             }
             const client = window.ApiClient;

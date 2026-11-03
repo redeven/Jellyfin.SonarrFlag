@@ -14,7 +14,7 @@ async function confirm(client) {
     await client.flush();
 }
 
-test('adds Mark as Broken to an episode menu for admins', async t => {
+test('adds Mark as Broken to an episode menu for users who are allowed', async t => {
     const client = createClient({ items: { ep1: episode('ep1') } });
     t.after(() => client.close());
 
@@ -58,7 +58,7 @@ test('does not add the entry for other item types', async t => {
     assert.equal(client.menuItem(sheet), null);
 });
 
-test('does not add the entry for non-admins, and never looks the item up', async t => {
+test('does not add the entry for users who are not allowed, and never looks the item up', async t => {
     const client = createClient({ admin: false, items: { ep1: episode('ep1') } });
     t.after(() => client.close());
 
@@ -228,7 +228,7 @@ test('rechecks the playing item when a new video starts', async t => {
     assert.ok(!client.osdButton().classList.contains('hide'));
 });
 
-test('does not show the OSD button to non-admins', async t => {
+test('does not show the OSD button to users who are not allowed', async t => {
     const client = createClient({ admin: false, nowPlaying: episode('ep1') });
     t.after(() => client.close());
 
@@ -290,12 +290,24 @@ test('the OSD button uses the item playing at click time', async t => {
     assert.deepEqual(client.requests.map(r => r.path), ['SonarrFlag/Broken/ep2']);
 });
 
-test('caches the admin check', async t => {
+test('caches the permission check', async t => {
     const client = createClient({ items: { ep1: episode('ep1') } });
     t.after(() => client.close());
 
     await openMenuFor(client, 'ep1');
     await openMenuFor(client, 'ep1');
 
-    assert.equal(client.calls.filter(c => c === 'getCurrentUser').length, 1);
+    assert.equal(client.calls.filter(c => c === 'getPermission').length, 1);
+});
+
+test('hides the buttons when the permission check fails, and retries it next time', async t => {
+    const client = createClient({ items: { ep1: episode('ep1') }, routes: { 'GET SonarrFlag/Permission': fail() } });
+    t.after(() => client.close());
+
+    const sheet = await openMenuFor(client, 'ep1');
+    assert.equal(client.menuItem(sheet), null);
+
+    client.routes['GET SonarrFlag/Permission'] = { CanMarkBroken: true };
+    const retried = await openMenuFor(client, 'ep1');
+    assert.ok(client.menuItem(retried));
 });

@@ -1,5 +1,9 @@
 using System.Net;
 using System.Reflection;
+using System.Security.Claims;
+using Jellyfin.Data;
+using Jellyfin.Database.Implementations.Entities;
+using Jellyfin.Database.Implementations.Enums;
 using JellyfinSonarrFlag.Api;
 using JellyfinSonarrFlag.Tests.Helpers;
 using MediaBrowser.Common.Api;
@@ -18,6 +22,7 @@ public sealed class SonarrFlagControllerTests : IDisposable
     private readonly PluginHarness _harness = new();
     private readonly FakeSonarr _sonarr = new();
     private readonly ILibraryManager _libraryManager = Substitute.For<ILibraryManager>();
+    private readonly IUserManager _userManager = Substitute.For<IUserManager>();
     private readonly SonarrFlagController _controller;
 
     public SonarrFlagControllerTests()
@@ -26,7 +31,8 @@ public sealed class SonarrFlagControllerTests : IDisposable
         _harness.Plugin.Configuration.SonarrApiKey = FakeSonarr.ApiKey;
 
         var service = new BrokenEpisodeService(_libraryManager, _sonarr.Client, new ListLogger<BrokenEpisodeService>());
-        _controller = new SonarrFlagController(service, _sonarr.Client, new ListLogger<SonarrFlagController>());
+        _controller = new SonarrFlagController(service, _sonarr.Client, _userManager, new ListLogger<SonarrFlagController>());
+        SignIn(AddUser(admin: true));
     }
 
     public void Dispose()
@@ -36,12 +42,85 @@ public sealed class SonarrFlagControllerTests : IDisposable
     }
 
     [Fact]
-    public void RequiresAnAdministrator()
+    public void RequiresASignedInUser()
     {
         var authorize = typeof(SonarrFlagController).GetCustomAttribute<AuthorizeAttribute>();
 
-        Assert.Equal(Policies.RequiresElevation, authorize?.Policy);
+        Assert.NotNull(authorize);
+        Assert.Null(authorize.Policy);
         Assert.DoesNotContain(typeof(SonarrFlagController).GetMethods(), m => m.GetCustomAttribute<AllowAnonymousAttribute>() is not null);
+    }
+
+    [Fact]
+    public void Test_RequiresAnAdministrator()
+    {
+        var authorize = typeof(SonarrFlagController).GetMethod(nameof(SonarrFlagController.Test))!.GetCustomAttribute<AuthorizeAttribute>();
+
+        Assert.Equal(Policies.RequiresElevation, authorize?.Policy);
+    }
+
+    [Fact]
+    public void Permission_AdministratorsAreAlwaysAllowed()
+    {
+        Assert.True(_controller.Permission().Value?.CanMarkBroken);
+    }
+
+    [Fact]
+    public void Permission_AllowedUsersAreAllowed()
+    {
+        var userId = AddUser(admin: false);
+        _harness.Plugin.Configuration.AllowedUserIds = [userId];
+        SignIn(userId);
+
+        Assert.True(_controller.Permission().Value?.CanMarkBroken);
+    }
+
+    [Fact]
+    public void Permission_OtherUsersAreNot()
+    {
+        _harness.Plugin.Configuration.AllowedUserIds = [Guid.NewGuid()];
+        SignIn(AddUser(admin: false));
+
+        Assert.False(_controller.Permission().Value?.CanMarkBroken);
+    }
+
+    [Fact]
+    public void Permission_UnknownOrMissingUsersAreNot()
+    {
+        var unknown = Guid.NewGuid();
+        _harness.Plugin.Configuration.AllowedUserIds = [unknown];
+        SignIn(unknown);
+        Assert.False(_controller.Permission().Value?.CanMarkBroken);
+
+        _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
+        Assert.False(_controller.Permission().Value?.CanMarkBroken);
+    }
+
+    [Fact]
+    public async Task MarkBroken_AllowedUsersCanMarkEpisodes()
+    {
+        var episodeId = SetUpEpisode();
+        var userId = AddUser(admin: false);
+        _harness.Plugin.Configuration.AllowedUserIds = [userId];
+        SignIn(userId);
+
+        var response = await _controller.MarkBroken(episodeId, CancellationToken.None);
+
+        Assert.Equal("The Show S01E01", response.Value?.Episode);
+    }
+
+    [Fact]
+    public async Task MarkBroken_OtherUsersAreForbidden()
+    {
+        var episodeId = SetUpEpisode();
+        SignIn(AddUser(admin: false));
+
+        var response = await _controller.MarkBroken(episodeId, CancellationToken.None);
+
+        var result = Assert.IsType<ObjectResult>(response.Result);
+        Assert.Equal(StatusCodes.Status403Forbidden, result.StatusCode);
+        Assert.IsType<ErrorResponse>(result.Value);
+        Assert.Empty(_sonarr.Requests);
     }
 
     [Fact]
@@ -111,6 +190,23 @@ public sealed class SonarrFlagControllerTests : IDisposable
         Assert.False(response.Value?.Ok);
         Assert.Empty(_sonarr.Requests);
     }
+
+    private Guid AddUser(bool admin)
+    {
+        var user = new User("user-" + Guid.NewGuid().ToString("N"), "auth", "reset") { Id = Guid.NewGuid() };
+        user.SetPermission(PermissionKind.IsAdministrator, admin);
+        _userManager.GetUserById(user.Id).Returns(user);
+        return user.Id;
+    }
+
+    private void SignIn(Guid userId)
+        => _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(SonarrFlagController.UserIdClaim, userId.ToString())], "Test"))
+            }
+        };
 
     private Guid SetUpEpisode()
     {

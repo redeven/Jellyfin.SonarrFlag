@@ -5,7 +5,20 @@
     <title>Sonarr Flag</title>
 </head>
 <body>
-    <div id="SonarrFlagConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button">
+    <div id="SonarrFlagConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+        <style>
+            #SonarrFlagConfigPage .sonarrFlagTabs { display: flex; gap: 0.5em; margin: 1em 0 1.5em; }
+            #SonarrFlagConfigPage .sonarrFlagTabs .emby-button { margin: 0; }
+            #SonarrFlagConfigPage .sonarrFlagTabs .emby-button:not(.ui-btn-active) { background: transparent; }
+            #SonarrFlagConfigPage .sonarrFlagUsers { width: 100%; border-collapse: collapse; }
+            #SonarrFlagConfigPage .sonarrFlagUsers th { text-align: left; font-weight: normal; opacity: 0.7; padding: 0.5em; }
+            #SonarrFlagConfigPage .sonarrFlagUsers td { padding: 0.5em; border-top: 1px solid rgba(128, 128, 128, 0.25); vertical-align: middle; }
+            #SonarrFlagConfigPage .sonarrFlagUsers .sonarrFlagAvatarCell { width: 2.5em; }
+            #SonarrFlagConfigPage .sonarrFlagUsers .sonarrFlagAllowCell { width: 1%; white-space: nowrap; text-align: center; }
+            #SonarrFlagConfigPage .sonarrFlagAvatar { width: 2.5em; height: 2.5em; border-radius: 50%; object-fit: cover; display: flex; align-items: center; justify-content: center; background: rgba(128, 128, 128, 0.3); }
+            #SonarrFlagConfigPage .sonarrFlagAllowCell .emby-checkbox-label { display: inline-flex; margin: 0; padding-left: 1.8em; height: auto; min-height: 1.8em; }
+            #SonarrFlagConfigPage .sonarrFlagAdminNote { opacity: 0.7; font-size: 90%; margin-left: 0.5em; }
+        </style>
         <div data-role="content">
             <div class="content-primary">
                 <form id="SonarrFlagConfigForm">
@@ -13,15 +26,37 @@
                         <h2 class="sectionTitle">Sonarr Flag</h2>
                         <p>Connects the <strong>Mark as Broken</strong> buttons to Sonarr. Marking an episode as broken blocklists its release, deletes the file, monitors the episode and searches for a replacement.</p>
                     </div>
-                    <div class="inputContainer">
-                        <input is="emby-input" type="url" id="SonarrUrl" label="Sonarr URL" placeholder="http://localhost:8989" required />
-                        <div class="fieldDescription">The address Jellyfin's server uses to reach Sonarr, including any URL base.</div>
+                    <div class="sonarrFlagTabs" role="tablist">
+                        <button is="emby-button" type="button" class="raised emby-button ui-btn-active" role="tab" data-tab="sonarr" aria-selected="true">
+                            <span>Sonarr</span>
+                        </button>
+                        <button is="emby-button" type="button" class="raised emby-button" role="tab" data-tab="users" aria-selected="false">
+                            <span>Users</span>
+                        </button>
                     </div>
-                    <div class="inputContainer">
-                        <input is="emby-input" type="password" id="SonarrApiKey" label="API key" autocomplete="off" required />
-                        <div class="fieldDescription">Found in Sonarr under Settings → General → Security.</div>
+                    <div class="sonarrFlagTab" data-tab="sonarr" role="tabpanel">
+                        <div class="inputContainer">
+                            <input is="emby-input" type="url" id="SonarrUrl" label="Sonarr URL" placeholder="http://localhost:8989" required />
+                            <div class="fieldDescription">The address Jellyfin's server uses to reach Sonarr, including any URL base.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <input is="emby-input" type="password" id="SonarrApiKey" label="API key" autocomplete="off" required />
+                            <div class="fieldDescription">Found in Sonarr under Settings → General → Security.</div>
+                        </div>
                     </div>
-                    <div>
+                    <div class="sonarrFlagTab hide" data-tab="users" role="tabpanel">
+                        <table class="sonarrFlagUsers">
+                            <thead>
+                                <tr>
+                                    <th class="sonarrFlagAvatarCell"><span class="hide">Avatar</span></th>
+                                    <th>Name</th>
+                                    <th class="sonarrFlagAllowCell">Allowed</th>
+                                </tr>
+                            </thead>
+                            <tbody id="SonarrFlagUsers"></tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top: 1.5em;">
                         <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                             <span>Save</span>
                         </button>
@@ -36,22 +71,116 @@
             (function () {
                 const pluginId = '2ca81606-4649-40ac-9283-f61588982f64';
                 const page = document.querySelector('#SonarrFlagConfigPage');
+                const form = page.querySelector('#SonarrFlagConfigForm');
+
+                /** Jellyfin serializes GUIDs without dashes, but compare loosely in case a config was written by hand. */
+                function normalizeId(id) {
+                    return String(id || '').replace(/-/g, '').toLowerCase();
+                }
+
+                function showTab(name) {
+                    page.querySelectorAll('.sonarrFlagTabs [data-tab]').forEach(function (button) {
+                        const active = button.getAttribute('data-tab') === name;
+                        button.classList.toggle('ui-btn-active', active);
+                        button.setAttribute('aria-selected', String(active));
+                    });
+                    page.querySelectorAll('.sonarrFlagTab').forEach(function (panel) {
+                        panel.classList.toggle('hide', panel.getAttribute('data-tab') !== name);
+                    });
+                    // The Sonarr fields are required, so only the active tab is validated on save.
+                    page.querySelector('#SonarrUrl').required = name === 'sonarr';
+                    page.querySelector('#SonarrApiKey').required = name === 'sonarr';
+                    page.querySelector('#SonarrFlagTest').classList.toggle('hide', name !== 'sonarr');
+                }
+
+                function escapeHtml(text) {
+                    const div = document.createElement('div');
+                    div.textContent = text == null ? '' : String(text);
+                    return div.innerHTML;
+                }
+
+                function avatarHtml(user) {
+                    if (user.PrimaryImageTag) {
+                        const src = ApiClient.getUrl('UserImage', { userId: user.Id, tag: user.PrimaryImageTag, maxHeight: 80 });
+                        return '<img class="sonarrFlagAvatar" alt="" loading="lazy" src="' + escapeHtml(src) + '">';
+                    }
+                    return '<div class="sonarrFlagAvatar"><span class="material-icons person" aria-hidden="true"></span></div>';
+                }
+
+                function isAdmin(user) {
+                    return !!(user.Policy && user.Policy.IsAdministrator);
+                }
+
+                /** Built as markup, like the rest of the page, so Jellyfin upgrades the emby-checkbox elements itself. */
+                function renderUsers(users, allowedIds) {
+                    const allowed = new Set((allowedIds || []).map(normalizeId));
+                    page.querySelector('#SonarrFlagUsers').innerHTML = users.slice().sort(function (a, b) {
+                        return (isAdmin(b) - isAdmin(a)) || String(a.Name).localeCompare(String(b.Name));
+                    }).map(function (user) {
+                        const admin = isAdmin(user);
+                        const checked = admin || allowed.has(normalizeId(user.Id));
+                        return '<tr>'
+                            + '<td class="sonarrFlagAvatarCell">' + avatarHtml(user) + '</td>'
+                            + '<td>' + escapeHtml(user.Name)
+                            + (admin ? '<span class="sonarrFlagAdminNote">Administrator</span>' : '') + '</td>'
+                            + '<td class="sonarrFlagAllowCell">'
+                            + '<label class="emby-checkbox-label"' + (admin ? ' title="Administrators can always mark as broken"' : '') + '>'
+                            + '<input is="emby-checkbox" type="checkbox" class="sonarrFlagAllow"'
+                            + ' data-user-id="' + escapeHtml(user.Id) + '"'
+                            + ' aria-label="' + escapeHtml('Allow ' + user.Name + ' to mark as broken') + '"'
+                            + (checked ? ' checked' : '') + (admin ? ' disabled' : '') + ' />'
+                            + '<span></span></label></td>'
+                            + '</tr>';
+                    }).join('');
+                }
+
+                page.querySelectorAll('.sonarrFlagTabs [data-tab]').forEach(function (button) {
+                    button.addEventListener('click', function () {
+                        showTab(button.getAttribute('data-tab'));
+                    });
+                });
 
                 page.addEventListener('pageshow', function () {
                     Dashboard.showLoadingMsg();
-                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    const config = ApiClient.getPluginConfiguration(pluginId);
+                    const users = ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('Users'), dataType: 'json' });
+
+                    config.then(function (config) {
                         page.querySelector('#SonarrUrl').value = config.SonarrUrl || '';
                         page.querySelector('#SonarrApiKey').value = config.SonarrApiKey || '';
+                    }).catch(function (error) {
+                        console.error('Sonarr Flag: could not load the configuration', error);
+                        Dashboard.alert('Could not load the settings.');
+                    });
+
+                    Promise.all([config, users]).then(function (results) {
+                        renderUsers(results[1] || [], results[0].AllowedUserIds);
+                    }).catch(function (error) {
+                        console.error('Sonarr Flag: could not load the users', error);
+                        page.querySelector('#SonarrFlagUsers').innerHTML =
+                            '<tr><td colspan="3" class="fieldDescription">Could not load the users.</td></tr>';
+                    }).finally(function () {
                         Dashboard.hideLoadingMsg();
                     });
                 });
 
-                page.querySelector('#SonarrFlagConfigForm').addEventListener('submit', function (event) {
+                form.addEventListener('submit', function (event) {
                     event.preventDefault();
+                    const url = page.querySelector('#SonarrUrl').value.trim();
+                    const apiKey = page.querySelector('#SonarrApiKey').value.trim();
+                    if (!url || !apiKey) {
+                        showTab('sonarr');
+                        form.reportValidity();
+                        return false;
+                    }
+
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                        config.SonarrUrl = page.querySelector('#SonarrUrl').value.trim();
-                        config.SonarrApiKey = page.querySelector('#SonarrApiKey').value.trim();
+                        config.SonarrUrl = url;
+                        config.SonarrApiKey = apiKey;
+                        config.AllowedUserIds = Array.from(page.querySelectorAll('.sonarrFlagAllow'))
+                            .filter(function (checkbox) { return checkbox.checked && !checkbox.disabled; })
+                            .map(function (checkbox) { return checkbox.getAttribute('data-user-id'); });
                         ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
                         });

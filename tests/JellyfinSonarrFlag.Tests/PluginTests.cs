@@ -41,12 +41,15 @@ public sealed class PluginTests : IDisposable
     {
         _harness.Plugin.Configuration.SonarrUrl = "http://sonarr:8989";
         _harness.Plugin.Configuration.SonarrApiKey = "key";
+        var allowed = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        _harness.Plugin.Configuration.AllowedUserIds = allowed;
         _harness.Plugin.SaveConfiguration();
 
         var reloaded = _harness.Restart().Configuration;
 
         Assert.Equal("http://sonarr:8989", reloaded.SonarrUrl);
         Assert.Equal("key", reloaded.SonarrApiKey);
+        Assert.Equal(allowed, reloaded.AllowedUserIds);
     }
 
     [Fact]

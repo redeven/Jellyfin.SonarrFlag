@@ -5,6 +5,7 @@ const source = readFileSync(new URL('../../Web/markBroken.js', import.meta.url),
 const SERVER = 'http://jellyfin.test/';
 const USER_ID = 'user1';
 const DEVICE_ID = 'device1';
+const PERMISSION = 'GET SonarrFlag/Permission';
 
 /** A route handler that makes the API call fail like ApiClient does: rejecting with a fetch Response. */
 export function fail(message) {
@@ -22,6 +23,7 @@ export function episode(id, extra = {}) {
 /**
  * Boots the plugin script in a fresh jsdom window with a fake Jellyfin ApiClient.
  * `routes` maps "METHOD path" to a response value or a function receiving the request.
+ * `admin` is what the permission lookup answers, unless `routes` overrides "GET SonarrFlag/Permission".
  * `items` maps item ids to what ApiClient.getItem returns; `nowPlaying` is this device's session item.
  */
 export function createClient({ hash = '#/home', admin = true, routes = {}, items = {}, nowPlaying = null } = {}) {
@@ -50,10 +52,6 @@ export function createClient({ hash = '#/home', admin = true, routes = {}, items
         getUrl: path => SERVER + path,
         getCurrentUserId: () => USER_ID,
         deviceId: () => DEVICE_ID,
-        getCurrentUser() {
-            calls.push('getCurrentUser');
-            return Promise.resolve({ Id: USER_ID, Policy: { IsAdministrator: client.admin } });
-        },
         getItem(userId, itemId) {
             calls.push('getItem ' + userId + ' ' + itemId);
             return itemId in client.items ? Promise.resolve(client.items[itemId]) : Promise.reject(new Error('Not found'));
@@ -69,8 +67,14 @@ export function createClient({ hash = '#/home', admin = true, routes = {}, items
                 body: request.data === undefined ? undefined : JSON.parse(request.data),
                 request
             };
+            const key = call.method + ' ' + call.path;
+            // The permission lookup is logged in `calls`, not `requests`, so tests can assert on the plugin's actions alone.
+            if (key === PERMISSION) {
+                calls.push('getPermission');
+                return respond(key in routes ? routes[key] : { CanMarkBroken: client.admin }, call);
+            }
             requests.push(call);
-            return respond(routes[call.method + ' ' + call.path], call);
+            return respond(routes[key], call);
         }
     };
 

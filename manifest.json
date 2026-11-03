@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/redeven/Jellyfin.SonarrFlag/main/Images/sonarr-flag.png",
     "versions": [
       {
+        "version": "1.1.0.0",
+        "changelog": "Added per-user permissions.",
+        "targetAbi": "12.4.0.0",
+        "sourceUrl": "https://github.com/redeven/Jellyfin.SonarrFlag/releases/download/v1.1.0.0/Jellyfin.SonarrFlag_1.1.0.0.zip",
+        "checksum": "07405cefcc53da84172247c517cc687d",
+        "timestamp": "2026-11-03T13:54:27Z"
+      },
+      {
         "version": "1.0.0.0",
         "changelog": "Initial release.",
         "targetAbi": "12.4.0.0",

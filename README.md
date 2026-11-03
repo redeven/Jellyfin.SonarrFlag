@@ -6,16 +6,9 @@ Mark broken episodes from Jellyfin, and have Sonarr replace them.
 
 ## Features
 
-- **Mark as Broken** entry in the context menu of episodes, available from a card's ⋮ menu, a right-click, or the ⋮ button on an episode's details page.
-- A **Mark as Broken** button (💔 icon) in the video player's controls, next to the settings, picture-in-picture and fullscreen buttons.
-- After you confirm, Sonarr:
-  1. blocklists the release the file came from, so the same release isn't downloaded again,
-  2. deletes the episode file,
-  3. monitors the episode again, in case deleting the file unmonitored it,
-  4. searches for a replacement.
-- Files that contain several episodes are handled as a whole: every episode in the file is blocklisted, monitored and searched.
-- Only administrators see the buttons, and only administrators can call the API.
-- The Sonarr API key stays on the server. The browser only talks to Jellyfin.
+- Mark as Broken button in episode menus and video player
+- Blocklists the release, deletes the file and searches for a replacement
+- Per-user permissions to let non-admins mark episodes as broken
 
 ## Prerequisites
 
@@ -39,7 +32,8 @@ Mark broken episodes from Jellyfin, and have Sonarr replace them.
 2. Enter the **Sonarr URL**, as Jellyfin's server reaches it, including any URL base. For example: `http://localhost:8989` or `http://sonarr:8989/sonarr`.
 3. Enter the **API key**, from Sonarr's **Settings → General → Security**.
 4. Click **Test connection**. It should report Sonarr's version.
-5. Click **Save**.
+5. Optionally, open the **Users** tab and check the users who may mark episodes as broken.
+6. Click **Save**.
 
 ## Usage
 
